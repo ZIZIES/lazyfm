@@ -138,9 +138,15 @@ fn draw_file_info(frame: &mut Frame, area: Rect, app: &App) {
     let focused = app.focus == Focus::Left;
     let (title, text) = match app.tab().selected() {
         Some(e) => {
-            let mut lines = info_text(e);
-            lines.push(Line::from(""));
+            // name, then art, then details: keeps the sprite near the top so long
+            // wrapped details can't push it off the bottom of the panel.
+            let mut lines = vec![Line::from(Span::styled(
+                e.name.clone(),
+                Style::default().add_modifier(Modifier::BOLD),
+            ))];
             lines.extend(sprite_lines(icons::art(e), area.width));
+            lines.push(Line::from(""));
+            lines.extend(info_text(e));
             (format!(" file: {} ", icons::label(e)), lines)
         }
         None => (" file ".to_string(), vec![Line::from("nothing selected.")]),
@@ -259,13 +265,7 @@ fn draw_log(frame: &mut Frame, area: Rect, app: &App) {
 }
 
 fn info_text(e: &Entry) -> Vec<Line<'static>> {
-    let mut lines = Vec::new();
-    lines.push(Line::from(Span::styled(
-        e.name.clone(),
-        Style::default().add_modifier(Modifier::BOLD),
-    )));
-    lines.push(Line::from(""));
-    lines.push(kv("kind", e.kind().to_string()));
+    let mut lines = vec![kv("kind", e.kind().to_string())];
     if e.is_symlink
         && let Ok(target) = std::fs::read_link(&e.path)
     {
