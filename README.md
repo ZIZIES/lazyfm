@@ -27,7 +27,7 @@ okay fine it was made with ai but thats only because im still learning rust.
 
 deepseek 4.1 flash wrote most of it (cheap af). the icons were opus 5.5 after i asked like every other model and got desperate.
 
-#rainbow dash approved
+# rainbow dash approved
 ```rainbow dash approved
 ⠀⠀⠀⠀⠀⠀⠀⣀⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⣠⣴⣾⡯⠍⠀⠀⠈⠉⠓⠢⣄⠀⠀⢀⣤⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
