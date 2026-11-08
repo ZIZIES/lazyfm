@@ -1,5 +1,6 @@
 Output demo.gif
 
+Set FontFamily "JetBrainsMono Nerd Font"
 Set Shell "bash"
 Set FontSize 18
 Set Width 1200
