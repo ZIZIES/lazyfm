@@ -18,7 +18,7 @@ i tried yazi and had no idea what to do when i opened it. lazyfm is the opposite
 ## install
 
 ```
-cargo install --git https://github.com/ZIZIES/lazyfm
+cargo install lazyfm
 ```
 
 needs rust 1.85+ (edition 2024). unix only (linux/macos), no windows.
