@@ -2,6 +2,14 @@
 name = "lazyfm"
 version = "0.1.0"
 edition = "2024"
+description = "a lazy tui file manager. no config, no docs needed"
+license = "Apache-2.0"
+repository = "https://github.com/ZIZIES/lazyfm"
+readme = "README.md"
+keywords = ["tui", "file-manager", "terminal", "cli", "ratatui"]
+categories = ["command-line-utilities"]
+rust-version = "1.85"
+exclude = ["demo.gif", "demo.tape"]
 
 [dependencies]
 crossterm = "0.29.0"
