@@ -2,11 +2,11 @@
 
 a lazy tui file manager. no setup, no docs needed. type `lazyfm` in a directory and you're in it.
 
-heads up: most of this was built with ai while i learn rust. code feedback is very welcome and appreciated to everybody. rejecting a pr is a thing for a reason.
+heads up: most of this was built with ai while i learn rust. code feedback is very welcome and appreciated and welcome from anybody. :)
 
 ![demo](demo.gif)
 
-i tried yazi and had no idea what to do when i opened it. lazyfm is the opposite: it drops you in the directory you ran it in, shows info and an icon for whatever's selected, and keeps the keys at the bottom of the screen.
+i tried other tui file managers, but i was not really a fan. i wanted to make another option, for people that prefer a carded look.
 
 - **zero config.** just run it
 - **card-style layout** instead of three crowded columns
@@ -22,9 +22,6 @@ cargo install lazyfm
 ```
 
 needs rust 1.85+ (edition 2024). unix only (linux/macos), no windows.
-
-## please read
-i am not trying to replace or be better than yazi. i think yazi is awesome and if it seems like i am flaming yazi let me know so i can change the readme.
 
 ## keys
 
