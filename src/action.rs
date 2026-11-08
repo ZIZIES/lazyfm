@@ -8,6 +8,7 @@ pub enum Action {
     PageDown,
     PageUp,
     Enter,
+    Menu,
     Parent,
     ToggleHidden,
     Refresh,
@@ -21,5 +22,4 @@ pub enum Action {
     NextTab,
     PrevTab,
     CycleIconTheme,
-    Help,
 }

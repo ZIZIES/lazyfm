@@ -1,8 +1,11 @@
 mod action;
 mod app;
+mod apps;
 mod entry;
+mod fsops;
 mod icons;
 mod keymap;
+mod overlay;
 mod ui;
 
 use std::io;
@@ -28,13 +31,7 @@ fn run(terminal: &mut ratatui::DefaultTerminal) -> io::Result<()> {
         terminal.draw(|frame| ui::draw(frame, &mut app))?;
         if event::poll(Duration::from_millis(250))? {
             match event::read()? {
-                Event::Key(key) if key.kind == KeyEventKind::Press => {
-                    if app.show_help {
-                        app.show_help = false;
-                    } else if let Some(action) = keymap::map(key) {
-                        app.handle(action);
-                    }
-                }
+                Event::Key(key) if key.kind == KeyEventKind::Press => app.handle_key(key),
                 Event::Mouse(mouse) => app.handle_mouse(mouse),
                 Event::Resize(_, _) => {}
                 _ => {}

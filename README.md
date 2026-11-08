@@ -14,11 +14,12 @@ cargo install --git https://github.com/ZIZIES/lazyfm
 |---|---|
 | `j`/`k` | down/up |
 | `h`/`l` | parent/enter |
+| `enter` | open a dir, or pop the file menu for a file |
+| `m` | file menu for any entry: open, open with, rename, delete, copy, cut, new file/folder, more. on `..` it's a folder menu (new file, new folder, paste) |
 | `g`/`G` | top/bottom |
 | `n` / `w` | new/close tab |
 | `.` | toggle hidden files |
 | `i` | cycle icon theme |
-| `?` | help |
 | `[` / `]` | switch tabs
 
 ## fine text (DONT READ)

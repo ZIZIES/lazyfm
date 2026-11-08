@@ -24,6 +24,7 @@ pub fn map(key: KeyEvent) -> Option<Action> {
         KeyCode::PageDown => Some(Action::PageDown),
         KeyCode::PageUp => Some(Action::PageUp),
         KeyCode::Enter | KeyCode::Char('l') | KeyCode::Right => Some(Action::Enter),
+        KeyCode::Char('m') => Some(Action::Menu),
         KeyCode::Char('h') | KeyCode::Left | KeyCode::Backspace => Some(Action::Parent),
         KeyCode::Char('.') => Some(Action::ToggleHidden),
         KeyCode::Char('r') => Some(Action::Refresh),
@@ -34,7 +35,6 @@ pub fn map(key: KeyEvent) -> Option<Action> {
         KeyCode::Char(']') => Some(Action::NextTab),
         KeyCode::Char('[') => Some(Action::PrevTab),
         KeyCode::Char('i') => Some(Action::CycleIconTheme),
-        KeyCode::Char('?') => Some(Action::Help),
         _ => None,
     }
 }

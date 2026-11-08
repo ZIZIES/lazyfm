@@ -12,6 +12,7 @@ use ratatui::widgets::{Block, BorderType, Clear, List, ListItem, ListState, Para
 use crate::app::{App, Focus};
 use crate::entry::Entry;
 use crate::icons;
+use crate::overlay::{Confirm, Menu, Overlay, Prompt};
 
 const LEFT_W: u16 = 26;
 const RIGHT_W: u16 = 38;
@@ -21,10 +22,13 @@ const SHOW_RIGHT_AT: u16 = 92;
 
 pub fn draw(frame: &mut Frame, app: &mut App) {
     let area = frame.area();
+    // the key bar grows to fit every key, but never eats more than a third of the screen.
+    let status = status_lines(app, area.width);
+    let status_h = (status.len() as u16).clamp(1, (area.height / 3).max(1));
     let rows = Layout::vertical([
         Constraint::Length(1),
         Constraint::Min(1),
-        Constraint::Length(1),
+        Constraint::Length(status_h),
     ])
     .split(area);
 
@@ -34,11 +38,112 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     draw_top(frame, body[0], app);
     draw_log(frame, body[1], app);
 
-    draw_status(frame, rows[2], app);
+    frame.render_widget(Paragraph::new(status), rows[2]);
 
-    if app.show_help {
-        draw_help(frame, area);
+    if let Some(overlay) = &app.overlay {
+        draw_overlay(frame, area, overlay);
     }
+}
+
+fn draw_overlay(frame: &mut Frame, area: Rect, overlay: &Overlay) {
+    match overlay {
+        Overlay::Menu(menu) => draw_menu(frame, area, menu),
+        Overlay::Prompt(prompt) => draw_prompt(frame, area, prompt),
+        Overlay::Confirm(confirm) => draw_confirm(frame, area, confirm),
+    }
+}
+
+fn draw_menu(frame: &mut Frame, area: Rect, menu: &Menu) {
+    let label_w = menu
+        .items
+        .iter()
+        .map(|i| i.label.chars().count())
+        .max()
+        .unwrap_or(0);
+    let width = (label_w.max(menu.title.chars().count()) as u16 + 6).min(area.width);
+    let height = (menu.items.len() as u16 + 2).min(area.height);
+    let popup = centered(area, width, height);
+    frame.render_widget(Clear, popup);
+
+    let items: Vec<ListItem> = menu
+        .items
+        .iter()
+        .map(|i| ListItem::new(Line::from(i.label.clone())))
+        .collect();
+    let mut state = ListState::default();
+    state.select(Some(menu.cursor));
+
+    let list = List::new(items)
+        .block(dialog(&menu.title))
+        .highlight_style(Style::default().add_modifier(Modifier::REVERSED | Modifier::BOLD))
+        .highlight_symbol("> ");
+    frame.render_stateful_widget(list, popup, &mut state);
+}
+
+fn draw_prompt(frame: &mut Frame, area: Rect, prompt: &Prompt) {
+    let width = ((prompt.label.chars().count().max(prompt.input.len()) as u16) + 6)
+        .max(30) // room for the "enter confirm   esc cancel" hint
+        .min(area.width);
+    let popup = centered(area, width, 5);
+    frame.render_widget(Clear, popup);
+
+    let mut spans = Vec::new();
+    for (i, ch) in prompt.input.iter().enumerate() {
+        let glyph = ch.to_string();
+        if i == prompt.cursor {
+            spans.push(Span::styled(
+                glyph,
+                Style::default().fg(Color::Black).bg(Color::White),
+            ));
+        } else {
+            spans.push(Span::raw(glyph));
+        }
+    }
+    if prompt.cursor >= prompt.input.len() {
+        spans.push(Span::styled(
+            " ",
+            Style::default().fg(Color::Black).bg(Color::White),
+        ));
+    }
+
+    let lines = vec![
+        Line::from(Span::styled(
+            prompt.label.clone(),
+            Style::default().fg(Color::Gray),
+        )),
+        Line::from(spans),
+        Line::from(Span::styled(
+            "enter confirm   esc cancel",
+            Style::default().fg(Color::DarkGray),
+        )),
+    ];
+    frame.render_widget(Paragraph::new(lines).block(dialog(&prompt.title)), popup);
+}
+
+fn draw_confirm(frame: &mut Frame, area: Rect, confirm: &Confirm) {
+    let width = ((confirm.message.chars().count() as u16) + 4)
+        .max(36)
+        .min(area.width);
+    let popup = centered(area, width, 6);
+    frame.render_widget(Clear, popup);
+
+    let lines = vec![
+        Line::from(""),
+        Line::from(confirm.message.clone()),
+        Line::from(""),
+        Line::from(Span::styled(
+            "[y] yes        [n] no",
+            Style::default().fg(Color::DarkGray),
+        )),
+    ];
+    frame.render_widget(Paragraph::new(lines).block(dialog(&confirm.title)), popup);
+}
+
+fn dialog(title: &str) -> Block<'static> {
+    Block::bordered()
+        .border_type(BorderType::Rounded)
+        .title(title.to_string())
+        .border_style(Style::default().fg(Color::Green))
 }
 
 fn draw_top(frame: &mut Frame, area: Rect, app: &mut App) {
@@ -296,9 +401,54 @@ fn kv(key: &str, value: String) -> Line<'static> {
     ])
 }
 
-fn draw_status(frame: &mut Frame, area: Rect, app: &App) {
-    let left = " j/k move  enter open  tab pane  n tab  . hidden  i icons  ? help ";
-    let right = format!(
+type Hint = (&'static str, &'static str);
+
+const MAIN_KEYS: &[Hint] = &[
+    ("j/k", "move"),
+    ("g/G", "top/bottom"),
+    ("^d/^u", "page"),
+    ("enter/l", "open"),
+    ("h/bksp", "parent"),
+    ("m", "menu"),
+    ("tab/S-tab", "pane"),
+    (".", "hidden"),
+    ("r", "refresh"),
+    ("n/^t", "new tab"),
+    ("w", "close tab"),
+    ("[/]", "prev/next tab"),
+    ("i", "icons"),
+    ("q", "quit"),
+];
+
+const MENU_KEYS: &[Hint] = &[("j/k", "move"), ("enter/l", "select"), ("esc/h", "back")];
+
+const PROMPT_KEYS: &[Hint] = &[
+    ("enter", "confirm"),
+    ("esc", "cancel"),
+    ("←/→", "cursor"),
+    ("home/end", "jump"),
+    ("bksp/del", "erase"),
+];
+
+const CONFIRM_KEYS: &[Hint] = &[("y", "yes"), ("n/esc/enter", "no")];
+
+/// the keys that do something right now: whatever owns the keyboard decides.
+fn key_hints(app: &App) -> &'static [Hint] {
+    match &app.overlay {
+        Some(Overlay::Menu(_)) => MENU_KEYS,
+        Some(Overlay::Prompt(_)) => PROMPT_KEYS,
+        Some(Overlay::Confirm(_)) => CONFIRM_KEYS,
+        None => MAIN_KEYS,
+    }
+}
+
+/// the bottom bar: every key hint, wrapped to `width`, with the tab/settings
+/// readout right-aligned on the last line (or its own line if it won't fit).
+fn status_lines(app: &App, width: u16) -> Vec<Line<'static>> {
+    let width = width as usize;
+    let mut lines = wrap_hints(key_hints(app), width);
+
+    let info = format!(
         "tab {}/{}  hidden:{}  icons:{} ",
         app.active + 1,
         app.tabs.len(),
@@ -309,54 +459,53 @@ fn draw_status(frame: &mut Frame, area: Rect, app: &App) {
         },
         app.settings.icons.label(),
     );
-    let width = area.width as usize;
-    let pad = width.saturating_sub(left.chars().count() + right.chars().count());
-    let line = Line::from(vec![
-        Span::styled(left, Style::default().fg(Color::Green)),
-        Span::raw(" ".repeat(pad)),
-        Span::styled(right, Style::default().fg(Color::DarkGray)),
-    ]);
-    frame.render_widget(Paragraph::new(line), area);
+    let info_w = info.chars().count();
+    let info = Span::styled(info, Style::default().fg(Color::DarkGray));
+    let last_w = lines.last().map(Line::width).unwrap_or(0);
+    match lines.last_mut() {
+        Some(last) if last_w + 2 + info_w <= width => {
+            last.spans
+                .push(Span::raw(" ".repeat(width - last_w - info_w)));
+            last.spans.push(info);
+        }
+        _ => lines.push(Line::from(vec![
+            Span::raw(" ".repeat(width.saturating_sub(info_w))),
+            info,
+        ])),
+    }
+    lines
 }
 
-fn draw_help(frame: &mut Frame, area: Rect) {
-    let text = vec![
-        Line::from(Span::styled(
-            "lazyfm keys",
-            Style::default()
-                .fg(Color::Green)
-                .add_modifier(Modifier::BOLD),
-        )),
-        Line::from(""),
-        Line::from("  j / k          move down / up"),
-        Line::from("  enter / l      open dir (or pick a place)"),
-        Line::from("  h / backspace  go to parent"),
-        Line::from("  g / G          top / bottom"),
-        Line::from("  .              toggle hidden files"),
-        Line::from("  r              refresh"),
-        Line::from("  tab            cycle pane focus"),
-        Line::from("  n / w          new / close tab"),
-        Line::from("  [ / ]          prev / next tab"),
-        Line::from("  i              cycle icon theme"),
-        Line::from("  ?              toggle this"),
-        Line::from("  q              quit"),
-        Line::from(""),
-        Line::from(Span::styled(
-            "  the rest is coming. patience, grasshopper.",
-            Style::default().fg(Color::DarkGray),
-        )),
-    ];
-    let popup = centered(area, 50, text.len() as u16 + 2);
-    frame.render_widget(Clear, popup);
-    frame.render_widget(
-        Paragraph::new(text).block(
-            Block::bordered()
-                .border_type(BorderType::Rounded)
-                .title(" help ")
-                .border_style(Style::default().fg(Color::Green)),
-        ),
-        popup,
-    );
+/// greedy word-wrap, but the "words" are whole hints so a key never gets
+/// split from its description.
+fn wrap_hints(hints: &[Hint], width: usize) -> Vec<Line<'static>> {
+    let key_style = Style::default()
+        .fg(Color::Green)
+        .add_modifier(Modifier::BOLD);
+    let desc_style = Style::default().fg(Color::Gray);
+
+    let mut lines = Vec::new();
+    let mut spans: Vec<Span<'static>> = Vec::new();
+    let mut used = 0;
+    for &(key, desc) in hints {
+        let key = Span::styled(key, key_style);
+        let desc = Span::styled(format!(" {desc}"), desc_style);
+        let w = key.width() + desc.width();
+        if !spans.is_empty() && used + 2 + w > width {
+            lines.push(Line::from(std::mem::take(&mut spans)));
+            used = 0;
+        }
+        // one space of margin at the start of a line, two between hints.
+        let gap = if spans.is_empty() { 1 } else { 2 };
+        spans.push(Span::raw(" ".repeat(gap)));
+        spans.push(key);
+        spans.push(desc);
+        used += gap + w;
+    }
+    if !spans.is_empty() {
+        lines.push(Line::from(spans));
+    }
+    lines
 }
 
 fn centered(area: Rect, w: u16, h: u16) -> Rect {
@@ -524,4 +673,32 @@ fn civil_from_days(z: i64) -> (i64, u32, u32) {
     let d = (doy - (153 * mp + 2) / 5 + 1) as u32;
     let m = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
     (if m <= 2 { y + 1 } else { y }, m, d)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn text(line: &Line) -> String {
+        line.spans.iter().map(|s| s.content.as_ref()).collect()
+    }
+
+    #[test]
+    fn hints_wrap_without_splitting_or_dropping_keys() {
+        for width in [30, 50, 80, 120] {
+            let lines = wrap_hints(MAIN_KEYS, width);
+            assert!(
+                lines.iter().all(|l| l.width() <= width),
+                "overflow at {width}"
+            );
+            let joined: String = lines.iter().map(text).collect::<Vec<_>>().join("\n");
+            for (key, desc) in MAIN_KEYS {
+                assert!(
+                    joined.contains(&format!("{key} {desc}")),
+                    "{key} lost at {width}"
+                );
+            }
+        }
+        assert_eq!(wrap_hints(MAIN_KEYS, 1000).len(), 1);
+    }
 }
