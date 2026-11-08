@@ -1,4 +1,5 @@
 # lazyfm
+[![Built With Ratatui](https://img.shields.io/badge/Built_With_Ratatui-000?logo=ratatui&logoColor=fff)](https://ratatui.rs/)
 
 a lazy tui file manager. no setup, no docs needed. type `lazyfm` in a directory and you're in it.
 
@@ -18,7 +19,7 @@ i tried other tui file managers, but i was not really a fan. i wanted to make an
 ## install
 
 ```
-cargo install lazyfm
+cargo install lazyfm --locked
 ```
 
 needs rust 1.85+ (edition 2024). unix only (linux/macos), no windows.
