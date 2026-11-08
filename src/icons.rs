@@ -60,11 +60,23 @@ pub fn kind_key(entry: &Entry) -> &'static str {
         "config"
     } else if named.ends_with(".pkg.tar.zst") {
         "package"
+    } else if is_versioned_so(&named) {
+        "library"
+    } else if ext == "obj" && entry.looks_binary {
+        // wavefront models are text; a binary .obj is a windows/COFF object file.
+        "object"
     } else if ext.is_empty() && entry.is_exec {
         "exec"
     } else {
         classify(&ext)
     }
+}
+
+/// "libc.so.6", "libssl.so.3.0.2": shared libraries whose extension is a version.
+fn is_versioned_so(name: &str) -> bool {
+    name.split_once(".so.").is_some_and(|(_, version)| {
+        !version.is_empty() && version.chars().all(|c| c.is_ascii_digit() || c == '.')
+    })
 }
 
 pub fn glyph(theme: IconTheme, entry: &Entry) -> String {
@@ -100,7 +112,13 @@ fn classify(ext: &str) -> &'static str {
         "lua" => "lua",
         "swift" => "swift",
         "zig" => "zig",
-        "s" | "asm" => "asm",
+        "s" | "asm" | "nasm" => "asm",
+        "o" | "ko" | "lo" => "object",
+        "a" | "so" | "dylib" | "lib" | "rlib" | "rmeta" => "library",
+        "dll" => "dll",
+        // make-style dependency lists from gcc -MD and cargo's target/ dir.
+        "d" => "depfile",
+        "bin" | "elf" | "hex" | "uf2" | "rom" => "binary",
         "wasm" => "wasm",
         "go" => "go",
         "json" => "json",
@@ -155,6 +173,11 @@ fn ascii(key: &str) -> &'static str {
         "swift" => "[SW]",
         "zig" => "[ZIG]",
         "asm" => "[ASM]",
+        "object" => "[OBJ]",
+        "library" => "[LIB]",
+        "dll" => "[DLL]",
+        "depfile" => "[DEP]",
+        "binary" => "[BIN]",
         "wasm" => "[WASM]",
         "go" => "[GO]",
         "json" => "{ }",
@@ -215,6 +238,10 @@ fn nerd(key: &str) -> &'static str {
         "swift" => "\u{e755}",
         "zig" => "\u{e6a9}",
         "asm" => "\u{f471}",
+        "object" => "\u{f1b3}",          // fa-cubes
+        "library" => "\u{f12e}",         // fa-puzzle-piece
+        "depfile" | "dll" => "\u{f0e8}", // fa-sitemap
+        "binary" => "\u{f2db}",          // fa-microchip
         "wasm" => "\u{e6a1}",
         "go" => "\u{e626}",
         "json" => "\u{e60b}",
@@ -275,6 +302,10 @@ fn emoji(key: &str) -> &'static str {
         "swift" => "🐦",
         "zig" => "⚡",
         "asm" => "🔩",
+        "object" => "🧱",
+        "library" => "🔌",
+        "depfile" | "dll" => "🌳",
+        "binary" => "💾",
         "wasm" => "🕸️",
         "go" => "🐹",
         "json" => "🧩",
@@ -336,6 +367,11 @@ pub fn label(entry: &Entry) -> &'static str {
         "swift" => "swift",
         "zig" => "zig",
         "asm" => "assembly",
+        "object" => "object file",
+        "library" => "library",
+        "dll" => "dll",
+        "depfile" => "dependency file",
+        "binary" => "binary",
         "wasm" => "webassembly",
         "go" => "go",
         "json" => "json",
@@ -445,6 +481,10 @@ fn sprite(key: &str) -> &'static Sprite {
         "swift" => &SWIFT,
         "zig" => &ZIG,
         "asm" => &ASM,
+        "object" => &OBJECT,
+        "library" => &LIBRARY,
+        "depfile" | "dll" => &DEPFILE,
+        "binary" => &BINARY,
         "wasm" => &WASM,
         "go" => &GO,
         "json" => &JSON,
@@ -1545,6 +1585,86 @@ const EXEC: Sprite = [
     "................",
 ];
 
+/// an object file is a brick: the linker snaps them together.
+const OBJECT: Sprite = [
+    "................",
+    "................",
+    "...aaaa..aaaa...",
+    "...oooo..oooo...",
+    "...OooO..OooO...",
+    ".aaaaaaaaaaaaaa.",
+    ".aooooooooooooO.",
+    ".aooooooooooooO.",
+    ".aooooooooooooO.",
+    ".aooooooooooooO.",
+    ".aooooooooooooO.",
+    ".aooooooooooooO.",
+    ".OOOOOOOOOOOOOO.",
+    ".DDDDDDDDDDDDDD.",
+    "................",
+    "................",
+];
+
+/// a library, as in a shelf of books.
+const LIBRARY: Sprite = [
+    "................",
+    "................",
+    "....bb..........",
+    "..rrbb..aa......",
+    "..rrbbnnaa..mm..",
+    "..eebbnnTTvvmm..",
+    "..rrbbeeaavvmm..",
+    "..rrbbnnaavvRR..",
+    "..rrbbnnaawwmm..",
+    "..rrccnnaavvmm..",
+    "..rrbbnnaavvmm..",
+    "..rrbbnnaavvmm..",
+    "..rrbbnnaavvmm..",
+    ".TTTTTTTTTTTTTT.",
+    ".DDDDDDDDDDDDDD.",
+    "................",
+];
+
+/// a target and the files it depends on. dlls borrow it too: dynamic *link* library.
+const DEPFILE: Sprite = [
+    "................",
+    "................",
+    "......bbbb......",
+    "......bwwb......",
+    "......bbbb......",
+    ".......gg.......",
+    ".......gg.......",
+    "..gggggggggggg..",
+    "..gg...gg...gg..",
+    "..gg...gg...gg..",
+    ".aaaa.nnnn.mmmm.",
+    ".awwa.nwwn.mwwm.",
+    ".aaaa.nnnn.mmmm.",
+    "................",
+    "................",
+    "................",
+];
+
+/// raw binary / firmware: a chip with its bits showing.
+const BINARY: Sprite = [
+    "................",
+    "................",
+    "...ssss..ssss...",
+    ".WWsSSSssSSSsWW.",
+    "...sSgSSSSSSs...",
+    ".WWsSSnSnnnSsWW.",
+    "...sSSnSnSnSs...",
+    ".WWsSSnSnSnSsWW.",
+    "...sSSnSnSnSs...",
+    ".WWsSSnSnnnSsWW.",
+    "...sSSSSSSSSs...",
+    ".WWsSSSSSSSSsWW.",
+    "...sSSSSSSSSs...",
+    "...ssssssssss...",
+    "................",
+    "................",
+];
+
 #[cfg(test)]
 mod tests {
     use super::{FILE, IconTheme, SPRITE_W, art, glyph, kind_key, pixel_rgb, sprite};
@@ -1563,6 +1683,7 @@ mod tests {
             uid: 0,
             gid: 0,
             mtime: None,
+            looks_binary: false,
         }
     }
 
@@ -1578,6 +1699,19 @@ mod tests {
             ("script.lua", "lua"),
             ("kernel.zig", "zig"),
             ("boot.s", "asm"),
+            ("start.S", "asm"),
+            ("kernel.asm", "asm"),
+            ("main.o", "object"),
+            ("driver.ko", "object"),
+            ("libfoo.a", "library"),
+            ("libfoo.so", "library"),
+            ("libc.so.6", "library"),
+            ("libssl.so.3.0.2", "library"),
+            ("user32.dll", "dll"),
+            ("liblazyfm-1234abcd.rlib", "library"),
+            ("lazyfm-1234abcd.rmeta", "library"),
+            ("lazyfm.d", "depfile"),
+            ("firmware.bin", "binary"),
             ("module.wasm", "wasm"),
             ("query.sql", "sql"),
             ("data.sqlite3", "database"),
@@ -1610,6 +1744,39 @@ mod tests {
         ] {
             assert_eq!(kind_key(&file(name)), expected, "{name}");
         }
+    }
+
+    #[test]
+    fn obj_is_a_model_when_text_and_an_object_file_when_binary() {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("lazyfm-obj-{nanos}"));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("teapot.obj"), b"# blender\nv 0 0 0\nf 1 2 3\n").unwrap();
+        // start of a real x86-64 COFF header: machine 0x8664, 3 sections, ...
+        std::fs::write(
+            dir.join("main.obj"),
+            [0x64, 0x86, 0x03, 0x00, 0x5e, 0x1f, 0, 0],
+        )
+        .unwrap();
+        std::fs::write(dir.join("EMPTY.OBJ"), b"").unwrap();
+        // a fifo must not be opened, or listing the folder would hang.
+        let fifo = std::ffi::CString::new(dir.join("pipe.obj").to_str().unwrap()).unwrap();
+        assert_eq!(unsafe { libc::mkfifo(fifo.as_ptr(), 0o644) }, 0);
+
+        let entries = crate::entry::read_dir(&dir, false).unwrap();
+        let kind = |name: &str| {
+            let e = entries.iter().find(|e| e.name == name).unwrap();
+            kind_key(e)
+        };
+        assert_eq!(kind("teapot.obj"), "model");
+        assert_eq!(kind("main.obj"), "object");
+        assert_eq!(kind("EMPTY.OBJ"), "model");
+        assert_eq!(kind("pipe.obj"), "model");
+
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
@@ -1647,6 +1814,11 @@ mod tests {
             "swift",
             "zig",
             "asm",
+            "object",
+            "library",
+            "depfile",
+            "dll",
+            "binary",
             "wasm",
             "go",
             "json",

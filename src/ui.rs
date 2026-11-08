@@ -555,6 +555,7 @@ fn icon_style(e: &Entry) -> Style {
         "image" | "video" | "model" => Color::Magenta,
         "audio" => Color::LightGreen,
         "archive" | "package" | "iso" | "torrent" => Color::Yellow,
+        "object" | "library" | "dll" | "binary" => Color::LightRed,
         "sql" | "database" => Color::Cyan,
         "lock" | "certificate" | "license" => Color::LightRed,
         "spreadsheet" | "document" | "presentation" | "ebook" | "pdf" | "markdown" => {
@@ -588,6 +589,7 @@ fn synth_dir(path: &Path) -> Entry {
         uid: 0,
         gid: 0,
         mtime: None,
+        looks_binary: false,
     }
 }
 

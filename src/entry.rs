@@ -1,5 +1,5 @@
 use std::fs;
-use std::io;
+use std::io::{self, Read};
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -16,6 +16,30 @@ pub struct Entry {
     pub uid: u32,
     pub gid: u32,
     pub mtime: Option<SystemTime>,
+    /// the file's first bytes contain a NUL. only checked for extensions in
+    /// SNIFFED, where text vs binary decides what the file is; false otherwise.
+    pub looks_binary: bool,
+}
+
+/// extensions shared by a text format and a binary one, so read_dir peeks
+/// inside: ".obj" is a wavefront 3d model (always text) or a windows/COFF
+/// object file (binary).
+const SNIFFED: &[&str] = &["obj"];
+
+fn wants_sniff(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| SNIFFED.iter().any(|s| e.eq_ignore_ascii_case(s)))
+}
+
+/// the git/grep trick: text files don't contain NUL bytes, binaries nearly
+/// always do within the first few hundred.
+fn looks_binary(path: &Path) -> bool {
+    let mut head = Vec::with_capacity(512);
+    match fs::File::open(path) {
+        Ok(file) => file.take(512).read_to_end(&mut head).is_ok() && head.contains(&0),
+        Err(_) => false,
+    }
 }
 
 impl Entry {
@@ -55,6 +79,7 @@ fn parent_entry(cwd: &Path) -> Option<Entry> {
         uid: meta.as_ref().map(|m| m.uid()).unwrap_or(0),
         gid: meta.as_ref().map(|m| m.gid()).unwrap_or(0),
         mtime: meta.as_ref().and_then(|m| m.modified().ok()),
+        looks_binary: false,
     })
 }
 
@@ -80,9 +105,13 @@ pub fn read_dir(path: &Path, show_hidden: bool) -> io::Result<Vec<Entry>> {
             Err(_) => continue,
         };
         let is_symlink = meta.file_type().is_symlink();
-        let is_dir = fs::metadata(&entry_path)
-            .map(|m| m.is_dir())
-            .unwrap_or(false);
+        // follows symlinks, so a link to a dir counts as a dir.
+        let target = fs::metadata(&entry_path).ok();
+        let is_dir = target.as_ref().is_some_and(|m| m.is_dir());
+        // regular files only: opening a fifo named "x.obj" would block forever.
+        let looks_binary = target.as_ref().is_some_and(|m| m.is_file())
+            && wants_sniff(&entry_path)
+            && looks_binary(&entry_path);
         entries.push(Entry {
             name,
             path: entry_path,
@@ -94,6 +123,7 @@ pub fn read_dir(path: &Path, show_hidden: bool) -> io::Result<Vec<Entry>> {
             uid: meta.uid(),
             gid: meta.gid(),
             mtime: meta.modified().ok(),
+            looks_binary,
         });
     }
 
